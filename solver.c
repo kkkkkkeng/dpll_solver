@@ -27,33 +27,15 @@ int isUnitClause(Clause *clause, int *literal_status)
     }
     return -1;
 }
-int init_status(Formula *formula, int *literal_status, int *clause_status)
+int init_status(Formula *formula, int *literal_status)
 {
-    for (int i = 0; i < formula->clause_num; i++)
-    {
-        clause_status[i] = 0;
-    }
     for (int i = 0; i <= formula->variable_num; i++)
     {
         literal_status[i] = 0;
     }
 }
-int update_clause_status(Formula *formula, int *literal_status, int *clause_status)
-{
-    int clause_count = formula->clause_num;
-    for (int i = 0; i < clause_count; i++)
-    {
-        if (clause_status[i] == 1)
-        {
-            continue;
-        }
-        if (check_clause(&(formula->clause_array[i]), literal_status) == 1)
-        {
-            clause_status[i] = 1;
-        }
-    }
-}
-int record_UnitClause(Formula *formula, int *literal_status, int *clause_status, int *trail, int *trail_pointer)
+
+int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer)
 {
     int isnewassigned = 1;
     while (isnewassigned)
@@ -61,13 +43,8 @@ int record_UnitClause(Formula *formula, int *literal_status, int *clause_status,
         isnewassigned = 0;
         for (int i = 0; i < formula->clause_num; i++)
         {
-            if (clause_status[i] == 1)
-            {
-                continue;
-            }
             if (isUnitClause(&(formula->clause_array[i]), literal_status) == 1)
             {
-                clause_status[i] = 1;
                 int index = 0;
                 int variable = 0;
                 int iscontradict = 1;
@@ -127,54 +104,34 @@ int select_branch_variable(Formula *formula, int *literal_status)
     }
     return 0;
 }
-int check_formula(Formula *formula, int *literal_status, int *clause_status)
+int check_formula(Formula *formula, int *literal_status)
 {
     int clause_count = formula->clause_num;
     for (int i = 0; i < formula->clause_num; i++)
     {
-
-        if (clause_status[i] == 1)
+        int res = check_clause(&(formula->clause_array[i]), literal_status);
+        if (res == -1)
+        {
+            return -1;
+        }
+        else if (res == 1)
         {
             clause_count--;
-            continue;
         }
-        else
-        {
-            int res = check_clause(&(formula->clause_array[i]), literal_status);
-            if (res == -1)
-            {
-                return -1;
-            }
-            else if (res == 1)
-            {
-                clause_count--;
-            }
-        }
-#ifdef DEBUG
-        if (i == 76)
-        {
-            for (int j = 1; j <= formula->variable_num; j++)
-            {
-                printf("literal_status[%d]: %d\n", j, literal_status[j]);
-            }
-            printf("\n");
-        }
-#endif
     }
-    if (clause_count == 0)
-    {
+    if(clause_count==0){
         return 1;
     }
     return 0;
 }
-int dpll_recursive(Formula *formula, int *literal_status, int *clause_status, int *trail, int *trail_pointer)
+int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer)
 {
-    int res = record_UnitClause(formula, literal_status, clause_status, trail, trail_pointer);
+    int res = record_UnitClause(formula, literal_status, trail, trail_pointer);
     if (res == -1)
     {
         return -1;
     }
-    res = check_formula(formula, literal_status, clause_status);
+    res = check_formula(formula, literal_status);
     if (res == -1)
     {
         return -1;
@@ -192,14 +149,14 @@ int dpll_recursive(Formula *formula, int *literal_status, int *clause_status, in
         }
         int level = *trail_pointer;
         assign_literal(literal_status, next_variable, 1, trail, trail_pointer);
-        int res = dpll_recursive(formula, literal_status, clause_status, trail, trail_pointer);
+        int res = dpll_recursive(formula, literal_status, trail, trail_pointer);
         if (res == 1)
         {
             return 1;
         }
         backtrack(literal_status, level, trail, trail_pointer);
         assign_literal(literal_status, next_variable, -1, trail, trail_pointer);
-        res = dpll_recursive(formula, literal_status, clause_status, trail, trail_pointer);
+        res = dpll_recursive(formula, literal_status, trail, trail_pointer);
         if (res == 1)
         {
             return 1;
@@ -210,12 +167,11 @@ int dpll_recursive(Formula *formula, int *literal_status, int *clause_status, in
 }
 int dpll_solve(Formula *formula, int *solution)
 {
-    int *literal_status = (int *)malloc(sizeof(int) * (formula->variable_num + 1)); // 存储每个变量的bool值 1true -1false 0未定 index 1~n+1
-    int *clause_status = (int *)malloc(sizeof(int) * formula->clause_num);          // 存储每个clause是否为单变元子句
+    int *literal_status = (int *)malloc(sizeof(int) * (formula->variable_num + 1)); // 存储每个变量的bool值 1true -1false 0未定 index 1~n+1         // 存储每个clause是否为单变元子句
     int *trail = (int *)malloc(sizeof(int) * (formula->variable_num + 1));
     int trail_pointer = 0;
-    init_status(formula, literal_status, clause_status);
-    int res = dpll_recursive(formula, literal_status, clause_status, trail, &trail_pointer);
+    init_status(formula, literal_status);
+    int res = dpll_recursive(formula, literal_status, trail, &trail_pointer);
     if (res == 1)
     {
         for (int i = 1; i <= formula->variable_num; i++)
@@ -224,7 +180,6 @@ int dpll_solve(Formula *formula, int *solution)
         }
     }
     free(literal_status);
-    free(clause_status);
     free(trail);
     return res;
 }

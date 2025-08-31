@@ -9,7 +9,7 @@ int main()
     char filename[20];
     scanf("%s", filename);
     parse_cnf(filename, &formula);
-    print_formula(&formula);
+    // print_formula(&formula);
     int *solution = (int *)malloc(sizeof(int) * (formula.variable_num + 1));
     if (dpll_solve(&formula, solution) == 1)
     {
