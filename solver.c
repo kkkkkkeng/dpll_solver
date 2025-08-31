@@ -25,7 +25,7 @@ int init_status(Formula *formula)
     {
         clause_status[i] = 0;
     }
-    for (int i = 0; i < formula->variable_num; i++)
+    for (int i = 0; i <= formula->variable_num; i++)
     {
         literal_status[i] = 0;
     }
@@ -41,40 +41,24 @@ int record_UnitClause(Formula *formula)
         if (isUnitClause(&(formula->clause_array[i])) == 1)
         {
             clause_status[i] = 1;
-            if (formula->clause_array[i].literal_array[0] > 0)
+            int index = 0;
+            int variable = 0;
+            int iscontradict = 1;
+            for (int j = 0; j < formula->clause_array[i].literal_num; j++)
             {
-                int index = 0;
-                for (int j = 0; j < formula->clause_array[i].literal_num; j++)
+                variable = abs(formula->clause_array[i].literal_array[j]);
+                if (literal_status[variable] == 0)
                 {
-                    if (literal_status[formula->clause_array[i].literal_array[j]] == 0)
-                    {
-                        index = j;
-                        break;
-                    }
+                    index = j;
+                    iscontradict = 0;
+                    break;
                 }
-                if (literal_status[formula->clause_array[i].literal_array[index]] == -1)
-                {
-                    return -1;
-                }
-                literal_status[formula->clause_array[i].literal_array[index]] = 1;
             }
-            else if (formula->clause_array[i].literal_array[0] < 0)
+            if (iscontradict == 1)
             {
-                int index = 0;
-                for (int j = 0; j < formula->clause_array[i].literal_num; j++)
-                {
-                    if (literal_status[-(formula->clause_array[i].literal_array[j])] == 0)
-                    {
-                        index = j;
-                        break;
-                    }
-                }
-                if (literal_status[-(formula->clause_array[i].literal_array[index])] == 1)
-                {
-                    return -1;
-                }
-                literal_status[-(formula->clause_array[i].literal_array[index])] = -1;
+                return -1;
             }
+            literal_status[variable] = formula->clause_array[i].literal_array[index] > 0 ? 1 : -1;
         }
     }
     return 1;
@@ -175,12 +159,15 @@ int dpll_recursive(Formula *formula)
 }
 int dpll_solve(Formula *formula)
 {
-    literal_status = (int *)malloc(sizeof(int) * formula->variable_num);
+    literal_status = (int *)malloc(sizeof(int) * (formula->variable_num + 1));
     clause_status = (int *)malloc(sizeof(int) * formula->clause_num);
+    init_status(formula);
     return dpll_recursive(formula);
 }
-int print_variable_status(Formula *formula){
-    for (int i = 1; i <= formula->variable_num;i++){
+int print_variable_status(Formula *formula)
+{
+    for (int i = 1; i <= formula->variable_num; i++)
+    {
         printf("%d ", literal_status[i]);
     }
 }

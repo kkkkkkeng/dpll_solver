@@ -9,8 +9,10 @@ int main()
     scanf("%s", filename);
     parse_cnf(filename, &formula);
     print_formula(formula);
-    dpll_solve(&formula);
-    print_variable_status(&formula);
+    if(dpll_solve(&formula)==1) print_variable_status(&formula);
+    else{
+        printf("error");
+    }
     system("pause");
     return 0;
 }
