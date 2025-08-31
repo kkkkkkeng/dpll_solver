@@ -3,29 +3,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define DEBUG
-int isUnitClause(Clause *clause, int *literal_status)
+int findUnitLiteral(Clause *clause, int *literal_status)
 {
-    int literal_count = clause->literal_num;
+    int literal_count = 0;
+    int unit_literal = 0;
     for (int i = 0; i < clause->literal_num; i++)
     {
         int variable = abs(clause->literal_array[i]);
-        if (literal_status[variable])
+        if (!literal_status[variable])
         {
-            if (literal_status[variable] * clause->literal_array[i] < 0)
-            {
-                literal_count--;
-            }
-            else
-            {
-                return -1;
-            }
+            literal_count++;
+            unit_literal = clause->literal_array[i];
+        }
+        else if (literal_status[variable] * clause->literal_array[i] > 0)
+        {
+            return 0;
         }
     }
     if (literal_count == 1)
     {
-        return 1;
+        return unit_literal;
     }
-    return -1;
+    return 0;
 }
 int init_status(Formula *formula, int *literal_status)
 {
@@ -43,26 +42,11 @@ int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *tr
         isnewassigned = 0;
         for (int i = 0; i < formula->clause_num; i++)
         {
-            if (isUnitClause(&(formula->clause_array[i]), literal_status) == 1)
+            int unit_literal = findUnitLiteral(&(formula->clause_array[i]), literal_status);
+            if (unit_literal)
             {
-                int index = 0;
-                int variable = 0;
-                int iscontradict = 1;
-                for (int j = 0; j < formula->clause_array[i].literal_num; j++)
-                {
-                    variable = abs(formula->clause_array[i].literal_array[j]);
-                    if (literal_status[variable] == 0)
-                    {
-                        index = j;
-                        iscontradict = 0;
-                        break;
-                    }
-                }
-                if (iscontradict == 1)
-                {
-                    return -1;
-                }
-                assign_literal(literal_status, variable, formula->clause_array[i].literal_array[index] > 0 ? 1 : -1, trail, trail_pointer);
+                int variable = abs(unit_literal);
+                assign_literal(literal_status, variable, unit_literal > 0 ? 1 : -1, trail, trail_pointer);
                 isnewassigned = 1;
             }
         }
@@ -119,7 +103,8 @@ int check_formula(Formula *formula, int *literal_status)
             clause_count--;
         }
     }
-    if(clause_count==0){
+    if (clause_count == 0)
+    {
         return 1;
     }
     return 0;
