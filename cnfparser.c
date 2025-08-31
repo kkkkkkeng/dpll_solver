@@ -65,16 +65,3 @@ int parse_cnf(char *filename, Formula *formula)
     return 0;
 }
 
-void print_formula(Formula formula)
-{
-    printf("clause num:%d\n", formula.clause_num);
-    printf("variable_num:%d\n", formula.variable_num);
-    for (int i = 0; i < formula.clause_num; i++)
-    {
-        for (int j = 0; j < formula.clause_array[i].literal_num; j++)
-        {
-            printf("%d ", formula.clause_array[i].literal_array[j]);
-        }
-        printf("\n");
-    }
-}
