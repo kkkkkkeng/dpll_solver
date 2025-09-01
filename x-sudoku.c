@@ -30,6 +30,10 @@ int init_clause_list(clause_list *list, int capacity)
 }
 void free_clause_list(clause_list *list)
 {
+    for (int i = 0; i < list->count; i++)
+    {
+        free(list->clause[i].literal_array);
+    }
     free(list->clause);
     list->clause = NULL;
     list->count = 0;
@@ -44,8 +48,16 @@ int generate_sudoku_cnf(int sudoku[9][9], int type, char *output_filename)
     add_col_constraint_to_list(&list);
     if (type == PERCENT_SUDOKU)
     {
-        add_block_constraint_to_list(&list);
+        add_block_constraint_to_list(&list, 2, 2);
+        add_block_constraint_to_list(&list, 6, 6);
         add_diagonal_constraint_to_list(&list);
+    }
+    for (int i = 1; i <= 9; i += 3)
+    {
+        for (int j = 1; j <= 9; j += 3)
+        {
+            add_block_constraint_to_list(&list, i, j);
+        }
     }
     add_number_constraint_to_list(&list, sudoku);
     FILE *fp = fopen(output_filename, "w");
@@ -78,8 +90,8 @@ int add_cell_constraint_to_list(clause_list *list)
             for (int k = 1; k <= 9; k++)
             {
                 clause.literal_array[k - 1] = to_natural(i, j, k);
-                add_clause_to_list(list, &clause);
             }
+            add_clause_to_list(list, &clause);
             for (int m = 1; m <= 9; m++)
             {
                 for (int n = m + 1; n <= 9; n++)
@@ -100,6 +112,17 @@ int add_row_constraint_to_list(clause_list *list)
 {
     for (int i = 1; i <= 9; i++)
     {
+        for (int k = 1; k <= 9; k++)
+        {
+            Clause clause;
+            clause.literal_num = 9;
+            clause.literal_array = (int *)malloc(sizeof(int) * 9);
+            for (int j = 1; j <= 9; j++)
+            {
+                clause.literal_array[j - 1] = to_natural(i, j, k);
+            }
+            add_clause_to_list(list, &clause);
+        }
         for (int m = 1; m <= 9; m++)
         {
             for (int n = m + 1; n <= 9; n++)
@@ -122,6 +145,17 @@ int add_col_constraint_to_list(clause_list *list)
 {
     for (int i = 1; i <= 9; i++)
     {
+        for (int k = 1; k <= 9; k++)
+        {
+            Clause clause;
+            clause.literal_num = 9;
+            clause.literal_array = (int *)malloc(sizeof(int) * 9);
+            for (int j = 1; j <= 9; j++)
+            {
+                clause.literal_array[j - 1] = to_natural(j, i, k);
+            }
+            add_clause_to_list(list, &clause);
+        }
         for (int m = 1; m <= 9; m++)
         {
             for (int n = m + 1; n <= 9; n++)
@@ -140,8 +174,27 @@ int add_col_constraint_to_list(clause_list *list)
     }
     return 1;
 }
-int add_block_constraint_to_list(clause_list *list)
+int add_block_constraint_to_list(clause_list *list, int row_start, int col_start)
 {
+    for (int k = 1; k <= 9; k++)
+    {
+        Clause clause;
+        clause.literal_num = 9;
+        clause.literal_array = (int *)malloc(sizeof(int) * 9);
+        for (int i = 1; i <= 9; i++)
+        {
+            clause.literal_array[i - 1] = to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
+        }
+        add_clause_to_list(list, &clause);
+        Clause clause2;
+        clause2.literal_num = 9;
+        clause2.literal_array = (int *)malloc(sizeof(int) * 9);
+        for (int i = 1; i <= 9; i++)
+        {
+            clause2.literal_array[i - 1] = to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
+        }
+        add_clause_to_list(list, &clause2);
+    }
     for (int i = 1; i <= 9; i++)
     {
         for (int j = i + 1; j <= 9; j++)
@@ -151,14 +204,14 @@ int add_block_constraint_to_list(clause_list *list)
                 Clause clause;
                 clause.literal_num = 2;
                 clause.literal_array = (int *)malloc(sizeof(int) * 2);
-                clause.literal_array[0] = -to_natural(2 + (i - 1) / 3, 2 + (i - 1) % 3, k);
-                clause.literal_array[1] = -to_natural(2 + (j - 1) / 3, 2 + (j - 1) % 3, k);
+                clause.literal_array[0] = -to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
+                clause.literal_array[1] = -to_natural(row_start + (j - 1) / 3, col_start + (j - 1) % 3, k);
                 add_clause_to_list(list, &clause);
                 Clause clause2;
                 clause2.literal_num = 2;
                 clause2.literal_array = (int *)malloc(sizeof(int) * 2);
-                clause2.literal_array[0] = -to_natural(6 + (i - 1) / 3, 6 + (i - 1) % 3, k);
-                clause2.literal_array[1] = -to_natural(6 + (j - 1) / 3, 6 + (j - 1) % 3, k);
+                clause2.literal_array[0] = -to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
+                clause2.literal_array[1] = -to_natural(row_start + (j - 1) / 3, col_start + (j - 1) % 3, k);
                 add_clause_to_list(list, &clause2);
             }
         }
@@ -166,6 +219,18 @@ int add_block_constraint_to_list(clause_list *list)
 }
 int add_diagonal_constraint_to_list(clause_list *list)
 {
+
+    for (int k = 1; k <= 9; k++)
+    {
+        Clause clause;
+        clause.literal_num = 9;
+        clause.literal_array = (int *)malloc(sizeof(int) * 9);
+        for (int i = 1; i <= 9; i++)
+        {
+            clause.literal_array[i - 1] = to_natural(i, 10 - i, k);
+        }
+        add_clause_to_list(list, &clause);
+    }
     for (int i = 1; i <= 9; i++)
     {
         for (int j = i + 1; j <= 9; j++)
@@ -175,8 +240,8 @@ int add_diagonal_constraint_to_list(clause_list *list)
                 Clause clause;
                 clause.literal_num = 2;
                 clause.literal_array = (int *)malloc(sizeof(int) * 2);
-                clause.literal_array[0] = -to_natural(i, i, k);
-                clause.literal_array[1] = -to_natural(j, j, k);
+                clause.literal_array[0] = -to_natural(i, 10 - i, k);
+                clause.literal_array[1] = -to_natural(j, 10 - j, k);
                 add_clause_to_list(list, &clause);
             }
         }
@@ -207,13 +272,14 @@ int to_natural(int row, int col, int val)
 }
 int to_sudoku(int natural, int *row, int *col, int *val)
 {
-    if (natural < 0)
+    if (natural < 0 || natural > 9 * 9 * 9)
     {
         return -1;
     }
-    *row = natural / 9 / 9 + 1;
+    natural--;
+    *val = natural % 9 + 1;
     *col = natural / 9 % 9 + 1;
-    *val = natural % 9 == 0 ? 9 : natural % 9;
+    *row = natural / 9 / 9 + 1;
     return 1;
 }
 int convert_solution_to_sudoku(int *solution, int sudoku[9][9])
@@ -246,7 +312,8 @@ int read_sudoku_from_file(char *filename, int sudoku[9][9])
             {
                 sudoku[i][j] = c - '0';
             }
-            else{
+            else
+            {
                 sudoku[i][j] = 0;
             }
         }

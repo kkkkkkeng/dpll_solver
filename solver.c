@@ -219,3 +219,26 @@ int print_solution(Formula *formula, int *solution)
     }
     printf("\n");
 }
+int output_solution_tofile(Formula *formula, int *solution,char* filename,int res,int time)
+{
+    FILE *fp = fopen(filename, "w");
+    if (fp == NULL)
+    {
+        printf("open file failed\n");
+        return -1;
+    }
+    if(res==0){
+        fprintf(fp,"s 0\n");
+    }
+    else if(res==1){
+        fprintf(fp,"s 1\n");
+        fprintf(fp, "v ");
+        for (int i = 1; i <= formula->variable_num;i++){
+            fprintf("%d ", solution[i] > 0 ? i : -i);
+        }
+        fprintf(fp,"\n");
+    }
+    fprintf(fp,"t %d\n",time);
+    fclose(fp);
+    return 1;
+}

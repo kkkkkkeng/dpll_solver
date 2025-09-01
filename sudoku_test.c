@@ -19,7 +19,7 @@ int main()
     printf("generate cnf success\n");
     Formula formula;
     parse_cnf(output_filename, &formula);
-    int *solution = (int *)malloc(formula.variable_num * sizeof(int));
+    int *solution = (int *)malloc((formula.variable_num + 1) * sizeof(int));
     dpll_solve(&formula, solution);
     printf("solve success\n");
     convert_solution_to_sudoku(solution, sudoku);
