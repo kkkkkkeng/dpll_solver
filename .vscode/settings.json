@@ -11,6 +11,9 @@
         "limits": "c",
         "typeinfo": "c",
         "stdio.h": "c",
-        "cnfparser.h": "c"
+        "cnfparser.h": "c",
+        "time.h": "c",
+        "math.h": "c",
+        "stdlib.h": "c"
     }
 }

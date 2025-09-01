@@ -2,7 +2,27 @@
 #include "datatype.h"
 #include <stdio.h>
 #include <stdlib.h>
-int add_clause_to_list(clause_list *list, Clause *clause)
+
+typedef struct clause_list
+{
+    Clause *clause;
+    int count;
+    int capacity;
+} clause_list;
+
+static int add_clause_to_list(clause_list *list, Clause *clause);                         // 添加子句到子句列表中
+static int init_clause_list(clause_list *list, int capacity);                             // 初始化子句列表
+static void free_clause_list(clause_list *list);                                          // 释放子句列表
+static int add_cell_constraint_to_list(clause_list *list);                                // 添加单元格限制到子句列表中
+static int add_row_constraint_to_list(clause_list *list);                                 // 添加行限制到子句列表中
+static int add_col_constraint_to_list(clause_list *list);                                 // 添加列限制到子句列表中
+static int add_block_constraint_to_list(clause_list *list, int row_start, int col_start); // 添加块限制到子句列表中
+static int add_diagonal_constraint_to_list(clause_list *list);                            // 添加对角线限制到子句列表中
+static int add_number_constraint_to_list(clause_list *list, int sudoku[9][9]);            // 添加棋盘中已存在的数字限制到子句列表中
+static int to_natural(int row, int col, int val);                                         // 将数独中的位置转换为自然数
+static int to_sudoku(int natural, int *row, int *col, int *val);                          // 将自然数转换为数独中的位置和值
+
+static int add_clause_to_list(clause_list *list, Clause *clause)
 {
     if (list->count == list->capacity)
     {
@@ -17,7 +37,7 @@ int add_clause_to_list(clause_list *list, Clause *clause)
     list->count++;
     return 1;
 }
-int init_clause_list(clause_list *list, int capacity)
+static int init_clause_list(clause_list *list, int capacity)
 {
     list->count = 0;
     list->capacity = capacity;
@@ -28,7 +48,7 @@ int init_clause_list(clause_list *list, int capacity)
     }
     return 1;
 }
-void free_clause_list(clause_list *list)
+static void free_clause_list(clause_list *list)
 {
     for (int i = 0; i < list->count; i++)
     {
@@ -42,16 +62,11 @@ void free_clause_list(clause_list *list)
 int generate_sudoku_cnf(int sudoku[9][9], int type, char *output_filename)
 {
     clause_list list;
-    init_clause_list(&list, 100);
+    init_clause_list(&list, 1024);
     add_cell_constraint_to_list(&list);
     add_row_constraint_to_list(&list);
     add_col_constraint_to_list(&list);
-    if (type == PERCENT_SUDOKU)
-    {
-        add_block_constraint_to_list(&list, 2, 2);
-        add_block_constraint_to_list(&list, 6, 6);
-        add_diagonal_constraint_to_list(&list);
-    }
+    add_number_constraint_to_list(&list, sudoku);
     for (int i = 1; i <= 9; i += 3)
     {
         for (int j = 1; j <= 9; j += 3)
@@ -59,7 +74,14 @@ int generate_sudoku_cnf(int sudoku[9][9], int type, char *output_filename)
             add_block_constraint_to_list(&list, i, j);
         }
     }
-    add_number_constraint_to_list(&list, sudoku);
+
+    if (type == PERCENT_SUDOKU)
+    {
+        add_block_constraint_to_list(&list, 2, 2);
+        add_block_constraint_to_list(&list, 6, 6);
+        add_diagonal_constraint_to_list(&list);
+    }
+
     FILE *fp = fopen(output_filename, "w");
     if (fp == NULL)
     {
@@ -78,7 +100,7 @@ int generate_sudoku_cnf(int sudoku[9][9], int type, char *output_filename)
     free_clause_list(&list);
     return 1;
 }
-int add_cell_constraint_to_list(clause_list *list)
+static int add_cell_constraint_to_list(clause_list *list)
 {
     for (int i = 1; i <= 9; i++)
     {
@@ -108,7 +130,7 @@ int add_cell_constraint_to_list(clause_list *list)
     }
     return 1;
 }
-int add_row_constraint_to_list(clause_list *list)
+static int add_row_constraint_to_list(clause_list *list)
 {
     for (int i = 1; i <= 9; i++)
     {
@@ -141,7 +163,7 @@ int add_row_constraint_to_list(clause_list *list)
     }
     return 1;
 }
-int add_col_constraint_to_list(clause_list *list)
+static int add_col_constraint_to_list(clause_list *list)
 {
     for (int i = 1; i <= 9; i++)
     {
@@ -174,26 +196,22 @@ int add_col_constraint_to_list(clause_list *list)
     }
     return 1;
 }
-int add_block_constraint_to_list(clause_list *list, int row_start, int col_start)
+static int add_block_constraint_to_list(clause_list *list, int row_start, int col_start)
 {
     for (int k = 1; k <= 9; k++)
     {
         Clause clause;
         clause.literal_num = 9;
         clause.literal_array = (int *)malloc(sizeof(int) * 9);
-        for (int i = 1; i <= 9; i++)
+        int index = 0;
+        for (int i = 0; i < 3; i++)
         {
-            clause.literal_array[i - 1] = to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
+            for (int j = 0; j < 3; j++)
+            {
+                clause.literal_array[index++] = to_natural(row_start + i, col_start + j, k);
+            }
         }
         add_clause_to_list(list, &clause);
-        Clause clause2;
-        clause2.literal_num = 9;
-        clause2.literal_array = (int *)malloc(sizeof(int) * 9);
-        for (int i = 1; i <= 9; i++)
-        {
-            clause2.literal_array[i - 1] = to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
-        }
-        add_clause_to_list(list, &clause2);
     }
     for (int i = 1; i <= 9; i++)
     {
@@ -207,17 +225,11 @@ int add_block_constraint_to_list(clause_list *list, int row_start, int col_start
                 clause.literal_array[0] = -to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
                 clause.literal_array[1] = -to_natural(row_start + (j - 1) / 3, col_start + (j - 1) % 3, k);
                 add_clause_to_list(list, &clause);
-                Clause clause2;
-                clause2.literal_num = 2;
-                clause2.literal_array = (int *)malloc(sizeof(int) * 2);
-                clause2.literal_array[0] = -to_natural(row_start + (i - 1) / 3, col_start + (i - 1) % 3, k);
-                clause2.literal_array[1] = -to_natural(row_start + (j - 1) / 3, col_start + (j - 1) % 3, k);
-                add_clause_to_list(list, &clause2);
             }
         }
     }
 }
-int add_diagonal_constraint_to_list(clause_list *list)
+static int add_diagonal_constraint_to_list(clause_list *list)
 {
 
     for (int k = 1; k <= 9; k++)
@@ -248,7 +260,7 @@ int add_diagonal_constraint_to_list(clause_list *list)
     }
     return 1;
 }
-int add_number_constraint_to_list(clause_list *list, int sudoku[9][9])
+static int add_number_constraint_to_list(clause_list *list, int sudoku[9][9])
 {
     for (int i = 1; i <= 9; i++)
     {
@@ -266,11 +278,11 @@ int add_number_constraint_to_list(clause_list *list, int sudoku[9][9])
     }
     return 1;
 }
-int to_natural(int row, int col, int val)
+static int to_natural(int row, int col, int val)
 {
     return (row - 1) * 9 * 9 + (col - 1) * 9 + val;
 }
-int to_sudoku(int natural, int *row, int *col, int *val)
+static int to_sudoku(int natural, int *row, int *col, int *val)
 {
     if (natural < 0 || natural > 9 * 9 * 9)
     {

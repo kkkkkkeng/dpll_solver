@@ -1,9 +1,20 @@
 #include "solver.h"
+#include <time.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define DEBUG
-int findUnitLiteral(Clause *clause, int *literal_status)
+
+static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer);              // 为变元var赋值value,并将赋值信息记录到trail中
+static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer);                            // 回溯到level层
+static int findUnitLiteral(Clause *clause, int *literal_status);                                                  // 查找clause中的单变元
+static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer);              // 将formula中的单变元子句记录到literal_status中; 出现矛盾直接返回-1;
+static int init_status(Formula *formula, int *literal_status);                                                    // 初始化literal_status数组
+static int check_clause(Clause *clause, int *literal_status);                                                     // 检查子句是否满足
+static int select_branch_variable(Formula *formula, int *literal_status);                                         // 选择分支变元
+static int check_formula(Formula *formula, int *literal_status);                                                  // 检查当前状态下所有子句是否有解
+static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, int start_time); // dpll_solve内部调用 递归处理dpll算法
+
+static int findUnitLiteral(Clause *clause, int *literal_status)
 {
     int literal_count = 0;
     int unit_literal = 0;
@@ -26,7 +37,7 @@ int findUnitLiteral(Clause *clause, int *literal_status)
     }
     return 0;
 }
-int init_status(Formula *formula, int *literal_status)
+static int init_status(Formula *formula, int *literal_status)
 {
     for (int i = 0; i <= formula->variable_num; i++)
     {
@@ -34,7 +45,7 @@ int init_status(Formula *formula, int *literal_status)
     }
 }
 
-int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer)
+static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer)
 {
     int isnewassigned = 1;
     while (isnewassigned)
@@ -53,7 +64,7 @@ int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *tr
     }
     return 1;
 }
-int check_clause(Clause *clause, int *literal_status)
+static int check_clause(Clause *clause, int *literal_status)
 {
     int literal_count = clause->literal_num;
     for (int i = 0; i < clause->literal_num; i++)
@@ -76,7 +87,7 @@ int check_clause(Clause *clause, int *literal_status)
     return 0;
 }
 
-int select_branch_variable(Formula *formula, int *literal_status)
+static int select_branch_variable(Formula *formula, int *literal_status)
 {
     int i = 0;
     for (i = 1; i <= formula->variable_num; i++)
@@ -88,7 +99,7 @@ int select_branch_variable(Formula *formula, int *literal_status)
     }
     return 0;
 }
-int check_formula(Formula *formula, int *literal_status)
+static int check_formula(Formula *formula, int *literal_status)
 {
     int clause_count = formula->clause_num;
     for (int i = 0; i < formula->clause_num; i++)
@@ -109,55 +120,62 @@ int check_formula(Formula *formula, int *literal_status)
     }
     return 0;
 }
-int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer)
+static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, int start_time)
 {
+    if (clock() - start_time > TIME_LIMIT * CLOCKS_PER_SEC)
+    {
+        return RES_TIME_OUT;
+    }
     int res = record_UnitClause(formula, literal_status, trail, trail_pointer);
     if (res == -1)
     {
-        return -1;
+        return RES_UNSAT;
     }
     res = check_formula(formula, literal_status);
     if (res == -1)
     {
-        return -1;
+        return RES_UNSAT;
     }
     else if (res == 1)
     {
-        return 1;
+        return RES_SAT;
     }
     else
     {
         int next_variable = select_branch_variable(formula, literal_status);
         if (next_variable == 0)
         {
-            return -1;
+            return RES_UNSAT;
         }
         int level = *trail_pointer;
         assign_literal(literal_status, next_variable, 1, trail, trail_pointer);
-        int res = dpll_recursive(formula, literal_status, trail, trail_pointer);
+        int res = dpll_recursive(formula, literal_status, trail, trail_pointer, start_time);
         if (res == 1)
         {
-            return 1;
+            return RES_SAT;
         }
         backtrack(literal_status, level, trail, trail_pointer);
         assign_literal(literal_status, next_variable, -1, trail, trail_pointer);
-        res = dpll_recursive(formula, literal_status, trail, trail_pointer);
+        res = dpll_recursive(formula, literal_status, trail, trail_pointer, start_time);
         if (res == 1)
         {
-            return 1;
+            return RES_SAT;
         }
         backtrack(literal_status, level, trail, trail_pointer);
-        return -1;
+        return RES_UNSAT;
     }
 }
-int dpll_solve(Formula *formula, int *solution)
+int dpll_solve(Formula *formula, int *solution, double *time)
 {
+    clock_t start_time = clock();
     int *literal_status = (int *)malloc(sizeof(int) * (formula->variable_num + 1)); // 存储每个变量的bool值 1true -1false 0未定 index 1~n+1         // 存储每个clause是否为单变元子句
     int *trail = (int *)malloc(sizeof(int) * (formula->variable_num + 1));
     int trail_pointer = 0;
     init_status(formula, literal_status);
-    int res = dpll_recursive(formula, literal_status, trail, &trail_pointer);
-    if (res == 1)
+    int res = dpll_recursive(formula, literal_status, trail, &trail_pointer, start_time);
+    clock_t end_time = clock();
+    *time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    if (res == RES_SAT)
     {
         for (int i = 1; i <= formula->variable_num; i++)
         {
@@ -168,13 +186,13 @@ int dpll_solve(Formula *formula, int *solution)
     free(trail);
     return res;
 }
-void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer)
+static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer)
 {
     literal_status[var] = value;
     trail[*trail_pointer] = var;
     (*trail_pointer)++;
 }
-void backtrack(int *literal_status, int level, int *trail, int *trail_pointer)
+static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer)
 {
     while (*trail_pointer > level)
     {
@@ -219,7 +237,7 @@ int print_solution(Formula *formula, int *solution)
     }
     printf("\n");
 }
-int output_solution_tofile(Formula *formula, int *solution,char* filename,int res,int time)
+int output_solution_tofile(Formula *formula, int *solution, char *filename, int res, double time)
 {
     FILE *fp = fopen(filename, "w");
     if (fp == NULL)
@@ -227,18 +245,24 @@ int output_solution_tofile(Formula *formula, int *solution,char* filename,int re
         printf("open file failed\n");
         return -1;
     }
-    if(res==0){
-        fprintf(fp,"s 0\n");
+    if (res == RES_UNSAT)
+    {
+        fprintf(fp, "s 0\n");
     }
-    else if(res==1){
-        fprintf(fp,"s 1\n");
+    else if (res == RES_SAT)
+    {
+        fprintf(fp, "s 1\n");
         fprintf(fp, "v ");
-        for (int i = 1; i <= formula->variable_num;i++){
-            fprintf("%d ", solution[i] > 0 ? i : -i);
+        for (int i = 1; i <= formula->variable_num; i++)
+        {
+            fprintf(fp, "%d ", solution[i] > 0 ? i : -i);
         }
-        fprintf(fp,"\n");
+        fprintf(fp, "\n");
     }
-    fprintf(fp,"t %d\n",time);
+    else if(res == RES_TIME_OUT){
+        fprintf(fp, "s -1\n");
+    }
+    fprintf(fp, "t %lf seconds\n", time);
     fclose(fp);
     return 1;
 }
