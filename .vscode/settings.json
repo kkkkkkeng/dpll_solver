@@ -1,5 +1,16 @@
 {
     "files.associations": {
-        "datatype.h": "c"
+        "datatype.h": "c",
+        "cmath": "cpp",
+        "cstdarg": "c",
+        "cstdint": "c",
+        "cstdio": "c",
+        "cstdlib": "c",
+        "exception": "c",
+        "type_traits": "c",
+        "limits": "c",
+        "typeinfo": "c",
+        "stdio.h": "c",
+        "cnfparser.h": "c"
     }
 }
