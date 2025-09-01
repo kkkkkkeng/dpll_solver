@@ -4,15 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer);              // 为变元var赋值value,并将赋值信息记录到trail中
-static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer);                            // 回溯到level层
-static int findUnitLiteral(Clause *clause, int *literal_status);                                                  // 查找clause中的单变元
-static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer);              // 将formula中的单变元子句记录到literal_status中; 出现矛盾直接返回-1;
-static int init_status(Formula *formula, int *literal_status);                                                    // 初始化literal_status数组
-static int check_clause(Clause *clause, int *literal_status);                                                     // 检查子句是否满足
-static int select_branch_variable(Formula *formula, int *literal_status);                                         // 选择分支变元
-static int check_formula(Formula *formula, int *literal_status);                                                  // 检查当前状态下所有子句是否有解
-static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, int start_time); // dpll_solve内部调用 递归处理dpll算法
+static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer);                                    // 为变元var赋值value,并将赋值信息记录到trail中
+static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer);                                                  // 回溯到level层
+static int findUnitLiteral(Clause *clause, int *literal_status);                                                                        // 查找clause中的单变元
+static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer);                                    // 将formula中的单变元子句记录到literal_status中; 出现矛盾直接返回-1;
+static int init_status(Formula *formula, int *literal_status);                                                                          // 初始化literal_status数组
+static int check_clause(Clause *clause, int *literal_status);                                                                           // 检查子句是否满足
+static int select_branch_variable(Formula *formula, int *literal_status);                                                               // 选择分支变元
+static int check_formula(Formula *formula, int *literal_status);                                                                        // 检查当前状态下所有子句是否有解
+static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, clock_t start_time, int *select_time); // dpll_solve内部调用 递归处理dpll算法
 
 static int findUnitLiteral(Clause *clause, int *literal_status)
 {
@@ -120,9 +120,9 @@ static int check_formula(Formula *formula, int *literal_status)
     }
     return 0;
 }
-static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, int start_time)
+static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, clock_t start_time, int *select_time)
 {
-    if (clock() - start_time > TIME_LIMIT * CLOCKS_PER_SEC)
+    if ((double)(clock() - start_time) > TIME_LIMIT * CLOCKS_PER_SEC)
     {
         return RES_TIME_OUT;
     }
@@ -143,20 +143,21 @@ static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int
     else
     {
         int next_variable = select_branch_variable(formula, literal_status);
+        (*select_time)++;
         if (next_variable == 0)
         {
             return RES_UNSAT;
         }
         int level = *trail_pointer;
         assign_literal(literal_status, next_variable, 1, trail, trail_pointer);
-        int res = dpll_recursive(formula, literal_status, trail, trail_pointer, start_time);
+        int res = dpll_recursive(formula, literal_status, trail, trail_pointer, start_time, select_time);
         if (res == 1)
         {
             return RES_SAT;
         }
         backtrack(literal_status, level, trail, trail_pointer);
         assign_literal(literal_status, next_variable, -1, trail, trail_pointer);
-        res = dpll_recursive(formula, literal_status, trail, trail_pointer, start_time);
+        res = dpll_recursive(formula, literal_status, trail, trail_pointer, start_time, select_time);
         if (res == 1)
         {
             return RES_SAT;
@@ -165,14 +166,14 @@ static int dpll_recursive(Formula *formula, int *literal_status, int *trail, int
         return RES_UNSAT;
     }
 }
-int dpll_solve(Formula *formula, int *solution, double *time)
+int dpll_solve(Formula *formula, int branch_select_strategy, int *solution, double *time, int *select_time)
 {
     clock_t start_time = clock();
     int *literal_status = (int *)malloc(sizeof(int) * (formula->variable_num + 1)); // 存储每个变量的bool值 1true -1false 0未定 index 1~n+1         // 存储每个clause是否为单变元子句
     int *trail = (int *)malloc(sizeof(int) * (formula->variable_num + 1));
     int trail_pointer = 0;
     init_status(formula, literal_status);
-    int res = dpll_recursive(formula, literal_status, trail, &trail_pointer, start_time);
+    int res = dpll_recursive(formula, literal_status, trail, &trail_pointer, start_time, select_time);
     clock_t end_time = clock();
     *time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     if (res == RES_SAT)
@@ -237,7 +238,7 @@ int print_solution(Formula *formula, int *solution)
     }
     printf("\n");
 }
-int output_solution_tofile(Formula *formula, int *solution, char *filename, int res, double time)
+int output_solution_tofile(Formula *formula, int *solution, char *filename, int res, double time, int select_time)
 {
     FILE *fp = fopen(filename, "w");
     if (fp == NULL)
@@ -259,10 +260,11 @@ int output_solution_tofile(Formula *formula, int *solution, char *filename, int 
         }
         fprintf(fp, "\n");
     }
-    else if(res == RES_TIME_OUT){
+    else if (res == RES_TIME_OUT)
+    {
         fprintf(fp, "s -1\n");
     }
-    fprintf(fp, "t %lf seconds\n", time);
+    fprintf(fp, "t finding solution after %.6Lf seconds and %d times selecting branch variable\n", time, select_time);
     fclose(fp);
     return 1;
 }
