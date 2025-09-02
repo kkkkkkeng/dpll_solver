@@ -1,5 +1,6 @@
 #include "x-sudoku.h"
 #include "datatype.h"
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +23,128 @@ static int add_diagonal_constraint_to_list(clause_list *list);                  
 static int add_number_constraint_to_list(clause_list *list, int sudoku[9][9]);            // 添加棋盘中已存在的数字限制到子句列表中
 static int to_natural(int row, int col, int val);                                         // 将数独中的位置转换为自然数
 static int to_sudoku(int natural, int *row, int *col, int *val);                          // 将自然数转换为数独中的位置和值
+
+static int shuffle_array(int *arr, int n);                                                     // 打乱数组
+static int check_col(int sudoku[9][9], int x, int y, int val);                                 // 检查列是否有冲突
+static int check_row(int sudoku[9][9], int x, int y, int val);                                 // 检查行是否有冲突
+static int check_block(int sudoku[9][9], int x, int y, int val, int row_start, int col_start); // 检查块是否有冲突
+static int check_diagonal(int sudoku[9][9], int x, int y, int val);                            // 检查对角线是否有冲突
+static int check_sudoku(int sudoku[9][9], int type, int x, int y);                             // 检查数独是否满足要求
+static int fill_sudoku(int sudoku[9][9], int type, int x, int y);                                     // 随机生成一个满足要求的数独
+
+static int shuffle_array(int *arr, int n)
+{
+    for (int i = n - 1; i >= 0; i--)
+    {
+        int j = rand() % (i + 1);
+        int temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+    return 1;
+}
+
+static int check_col(int sudoku[9][9], int x, int y, int val)
+{
+    for (int i = 0; i < x; i++)
+    {
+        if (sudoku[i][y] == val)
+            return -1;
+    }
+    return 1;
+}
+
+static int check_row(int sudoku[9][9], int x, int y, int val)
+{
+    for (int i = 0; i < y; i++)
+    {
+        if (sudoku[x][i] == val)
+            return -1;
+    }
+    return 1;
+}
+static int check_diagonal(int sudoku[9][9], int x, int y, int val)
+{
+    if (x != 8 - y)
+    {
+        return 1;
+    }
+    for (int i = 0; i < x; i++)
+    {
+        if (sudoku[i][8 - i] == val)
+            return -1;
+    }
+    return 1;
+}
+static int check_block(int sudoku[9][9], int x, int y, int val, int row_start, int col_start)
+{
+    if (x > row_start + 2 || y > col_start + 2 || x < row_start || y < col_start)
+    {
+        return 1;
+    }
+    for (int i = row_start; i <= row_start + 2; i++)
+    {
+        for (int j = col_start; j <= col_start + 2; j++)
+        {
+            if (i == x && j == y)
+                return 1;
+            if (sudoku[i][j] == val)
+                return -1;
+        }
+    }
+    return 1;
+}
+static int check_sudoku(int sudoku[9][9], int type, int x, int y)
+{
+    if (check_row(sudoku, x, y, sudoku[x][y]) == -1)
+        return -1;
+    if (check_col(sudoku, x, y, sudoku[x][y]) == -1)
+        return -1;
+    if (check_block(sudoku, x, y, sudoku[x][y], (x / 3) * 3, (y / 3) * 3) == -1)
+        return -1;
+    if (type == PERCENT_SUDOKU)
+    {
+        if (check_block(sudoku, x, y, sudoku[x][y], 1, 1) == -1)
+            return -1;
+        if (check_block(sudoku, x, y, sudoku[x][y], 5, 5) == -1)
+            return -1;
+        if (check_diagonal(sudoku, x, y, sudoku[x][y]) == -1)
+            return -1;
+    }
+    return 1;
+}
+static int fill_sudoku(int sudoku[9][9], int type, int x, int y)
+{
+    int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    shuffle_array(arr, 9);
+    for (int i = 0; i < 9; i++)
+    {
+        sudoku[x][y] = arr[i];
+        if (check_sudoku(sudoku, type, x, y) == 1)
+        {
+            if (y == 8)
+            {
+                if (x == 8)
+                    return 1;
+                else
+                {
+                    if (fill_sudoku(sudoku, type, x + 1, 0) == 1)
+                        return 1;
+                }
+            }
+            else
+            {
+                if (fill_sudoku(sudoku, type, x, y + 1) == 1)
+                    return 1;
+            }
+        }
+        else
+        {
+            sudoku[x][y] = 0;
+        }
+    }
+    return -1;
+}
 
 static int add_clause_to_list(clause_list *list, Clause *clause)
 {
@@ -310,17 +433,19 @@ int convert_solution_to_sudoku(int *solution, int sudoku[9][9])
 }
 int read_sudoku_from_file(char *filename, int sudoku[9][9])
 {
-    static char current_filename[100]="";
+    static char current_filename[100] = "";
     static FILE *fp = NULL;
-    if(strcmp(filename,current_filename)!=0)
+    if (strcmp(filename, current_filename) != 0)
     {
-        if(fp) fclose(fp);
+        if (fp)
+            fclose(fp);
         fp = fopen(filename, "r");
-        if(!fp){
-            filename[0]='\0';
+        if (!fp)
+        {
+            filename[0] = '\0';
             return -1;
         }
-        strcpy(current_filename,filename);
+        strcpy(current_filename, filename);
     }
     for (int i = 0; i < 9; i++)
     {
@@ -328,10 +453,12 @@ int read_sudoku_from_file(char *filename, int sudoku[9][9])
         {
             char c;
             c = fgetc(fp);
-            while(c!=EOF&&(c<'0'||c>'9')) c=fgetc(fp);
-            if(c==EOF) {
+            while (c != EOF && (c < '0' || c > '9'))
+                c = fgetc(fp);
+            if (c == EOF)
+            {
                 fclose(fp);
-                current_filename[0]='\0';
+                current_filename[0] = '\0';
                 return 0;
             }
             sudoku[i][j] = c - '0';

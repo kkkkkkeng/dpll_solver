@@ -13,4 +13,5 @@ int generate_sudoku(int sudoku[9][9], int type);                            // É
 int print_sudoku(int sudoku[9][9]);                                         // ´òÓ¡Êý¶À
 int convert_solution_to_sudoku(int *solution, int sudoku[9][9]);            // ½«cnfµÄ½â×ª»¯ÎªÊý¶À
 
+
 #endif
