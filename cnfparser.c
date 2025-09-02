@@ -62,6 +62,32 @@ int parse_cnf(char *filename, Formula *formula)
         }
     }
     fclose(fp);
-    return 0;
+    return 1;
 }
-
+int modify_file_name(char *filename)
+{
+    int i = 0;
+    while (filename[i])
+    {
+        if (filename[i] == '.')
+        {
+            for (int j = 1; j <=3; j++)
+            {
+                if (filename[i + j] == '\0')
+                    return -1;
+            }
+            if(filename[i+4]){
+                return -1;
+            }
+            if (filename[i + 1] == 'c' && filename[i + 2] == 'n' && filename[i + 3] == 'f' )
+            {
+                filename[i + 1] = 'r';
+                filename[i + 2] = 'e';
+                filename[i + 3] = 's';
+                return 1;
+            }
+        }
+        i++;
+    }
+    return -1;
+}

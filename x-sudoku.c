@@ -2,6 +2,7 @@
 #include "datatype.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct clause_list
 {
@@ -309,28 +310,33 @@ int convert_solution_to_sudoku(int *solution, int sudoku[9][9])
 }
 int read_sudoku_from_file(char *filename, int sudoku[9][9])
 {
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
+    static char current_filename[100]="";
+    static FILE *fp = NULL;
+    if(strcmp(filename,current_filename)!=0)
     {
-        return -1;
+        if(fp) fclose(fp);
+        fp = fopen(filename, "r");
+        if(!fp){
+            filename[0]='\0';
+            return -1;
+        }
+        strcpy(current_filename,filename);
     }
     for (int i = 0; i < 9; i++)
     {
         for (int j = 0; j < 9; j++)
         {
             char c;
-            fscanf(fp, "%c", &c);
-            if (c >= '1' && c <= '9')
-            {
-                sudoku[i][j] = c - '0';
+            c = fgetc(fp);
+            while(c!=EOF&&(c<'0'||c>'9')) c=fgetc(fp);
+            if(c==EOF) {
+                fclose(fp);
+                current_filename[0]='\0';
+                return 0;
             }
-            else
-            {
-                sudoku[i][j] = 0;
-            }
+            sudoku[i][j] = c - '0';
         }
     }
-    fclose(fp);
     return 1;
 }
 int print_sudoku(int sudoku[9][9])
