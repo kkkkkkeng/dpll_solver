@@ -1,2 +1,2 @@
 s -1
-t finding solution after 15.001000 seconds and 21694 times selecting branch variable
+t finding solution after 15.005000 seconds and 24738 times selecting branch variable
