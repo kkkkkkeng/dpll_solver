@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer);                                                                // 为变元var赋值value,并将赋值信息记录到trail中
 static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer);                                                                              // 回溯到level层
 static int findUnitLiteral(Clause *clause, int *literal_status);                                                                                                    // 查找clause中的单变元
@@ -180,10 +179,12 @@ static int check_clause(Clause *clause, int *literal_status)
 
 static int select_branch_variable(Formula *formula, int *literal_status, int branch_select_strategy)
 {
-    if(branch_select_strategy == RANDOM)
+    if (branch_select_strategy == RANDOM)
     {
-        for (int i = 1;i<=formula->variable_num;i++){
-            if (!literal_status[i]){
+        for (int i = 1; i <= formula->variable_num; i++)
+        {
+            if (!literal_status[i])
+            {
                 return i;
             }
         }

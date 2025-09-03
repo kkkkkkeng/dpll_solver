@@ -140,7 +140,6 @@ int solve_sudoku(int sudoku[9][9], int branch_select_stategy, int type, double *
 int generate_sudoku(int board[][9], int type)
 {
     memset(board, 0, sizeof(int) * 9 * 9);
-    clock_t start_time = clock();
     int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
     fill_sudoku(board, type, 0, 0, arr);
     int dig_sequence[81];
@@ -161,11 +160,12 @@ int generate_sudoku(int board[][9], int type)
         convert_sudoku_to_formula(board, &formula, type);
         int res = is_solution_unique(&formula, 1, &solution_count);
         free_formula(&formula);
-        if (res == RES_TIME_OUT || (double)(clock() - start_time) > TIME_LIMIT * CLOCKS_PER_SEC)
+        if (res == RES_TIME_OUT)
         {
             return RES_TIME_OUT;
         }
-    } while (solution_count == 1 && ++i < 81);
+        i++;
+    } while (solution_count == 1 && i < 81);
     if (solution_count > 1)
     {
         board[dig_sequence[i - 1] / 9][dig_sequence[i - 1] % 9] = record_last;

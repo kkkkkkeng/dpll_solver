@@ -72,11 +72,27 @@ int main()
                 double time = 0.0;
                 int *solution = (int *)malloc((formula.variable_num + 1) * sizeof(int));
                 printf("Solving...\n");
-                res = dpll_solve(&formula, RANDOM, solution, &time, &select_time);
+                res = dpll_solve(&formula, OPTIMIZED1, solution, &time, &select_time);
                 printf("DPLL Solver finished.\n");
+                if (res == RES_SAT)
+                {
+                    printf("SAT\n");
+                    printf("One solution is:\n");
+                    print_solution(&formula, solution);
+                    printf("Time: %f\n", time);
+                    printf("Selecting branch variable times: %d\n", select_time);
+                }
+                else if (res == RES_UNSAT)
+                {
+                    printf("UNSAT\n");
+                }
+                else if (res == RES_TIME_OUT)
+                {
+                    printf("The CNF formula solving time out.\n");
+                }
                 modify_file_name(filename);
                 output_solution_tofile(&formula, solution, filename, res, time, select_time);
-                printf("The solution has been written to the file %s\n", filename);
+                printf("The result has been written to the file %s\n", filename);
                 getchar();
             }
             break;
