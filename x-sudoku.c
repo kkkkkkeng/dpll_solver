@@ -1,5 +1,6 @@
 #include "x-sudoku.h"
 #include "datatype.h"
+#include "solver.h"
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +31,151 @@ static int check_row(int sudoku[9][9], int x, int y, int val);                  
 static int check_block(int sudoku[9][9], int x, int y, int val, int row_start, int col_start); // 检查块是否有冲突
 static int check_diagonal(int sudoku[9][9], int x, int y, int val);                            // 检查对角线是否有冲突
 static int check_sudoku(int sudoku[9][9], int type, int x, int y);                             // 检查数独是否满足要求
-static int fill_sudoku(int sudoku[9][9], int type, int x, int y);                                     // 随机生成一个满足要求的数独
+static int fill_sudoku(int sudoku[9][9], int type, int x, int y, int *arr);                    // 随机生成一个满足要求的数独
+
+static int x_sudoku_check(int sudoku[9][9]); // 检查数独是否满足%数独要求
+
+static int convert_sudoku_to_formula(int sudoku[9][9], Formula *formula, int type)
+{
+    if (formula == NULL)
+    {
+        return -1;
+    }
+    clause_list list;
+    init_clause_list(&list, 1024);
+    add_cell_constraint_to_list(&list);
+    add_row_constraint_to_list(&list);
+    add_col_constraint_to_list(&list);
+    for (int i = 1; i <= 9; i += 3)
+    {
+        for (int j = 1; j <= 9; j += 3)
+        {
+            add_block_constraint_to_list(&list, i, j);
+        }
+    }
+    if (type == PERCENT_SUDOKU)
+    {
+        add_block_constraint_to_list(&list, 2, 2);
+        add_block_constraint_to_list(&list, 6, 6);
+        add_diagonal_constraint_to_list(&list);
+    }
+    add_number_constraint_to_list(&list, sudoku);
+    formula->clause_num = list.count;
+    formula->variable_num = 9 * 9 * 9;
+    formula->clause_array = list.clause;
+    list.clause = NULL;
+    list.count = 0;
+    list.capacity = 0;
+    return 1;
+}
+
+static int x_sudoku_check(int sudoku[9][9])
+{
+    int record[10] = {0};
+    for (int i = 0; i < 9; i++)
+    {
+        if (record[sudoku[i][8 - i]] == 1)
+        {
+            return -1;
+        }
+        else
+        {
+            record[sudoku[i][8 - i]] = 1;
+        }
+    }
+    memset(record, 0, sizeof(record));
+    for (int i = 1; i <= 3; i++)
+    {
+        for (int j = 1; j <= 3; j++)
+        {
+            if (record[sudoku[i][j]] == 1)
+            {
+                return -1;
+            }
+            else
+            {
+                record[sudoku[i][j]] = 1;
+            }
+        }
+    }
+    memset(record, 0, sizeof(record));
+    for (int i = 5; i <= 7; i++)
+    {
+        for (int j = 5; j <= 7; j++)
+        {
+            if (record[sudoku[i][j]] == 1)
+            {
+                return -1;
+            }
+            else
+            {
+                record[sudoku[i][j]] = 1;
+            }
+        }
+    }
+    return 1;
+}
+
+int solve_sudoku(int sudoku[9][9], int branch_select_stategy, int type, double *time, int *select_time)
+{
+    Formula formula;
+    convert_sudoku_to_formula(sudoku, &formula, type);
+    int *solution = (int *)malloc((formula.variable_num + 1) * sizeof(int));
+    int res = dpll_solve(&formula, branch_select_stategy, solution, time, select_time);
+    if (res == RES_SAT)
+    {
+        convert_solution_to_sudoku(solution, sudoku);
+        free(solution);
+        free_formula(&formula);
+        return RES_SAT;
+    }
+    else
+    {
+        free(solution);
+        free_formula(&formula);
+        return res;
+    }
+}
+
+int generate_sudoku(int board[][9], int type)
+{
+    memset(board, 0, sizeof(int) * 9 * 9);
+    clock_t start_time = clock();
+    int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    fill_sudoku(board, type, 0, 0, arr);
+    int dig_sequence[81];
+    for (int i = 0; i < 81; i++)
+    {
+        dig_sequence[i] = i;
+    }
+    shuffle_array(dig_sequence, 81);
+    int i = 0;
+    Formula formula;
+    int solution_count = 0;
+    int record_last = 0;
+    do
+    {
+        solution_count = 0;
+        record_last = board[dig_sequence[i] / 9][dig_sequence[i] % 9];
+        board[dig_sequence[i] / 9][dig_sequence[i] % 9] = 0;
+        convert_sudoku_to_formula(board, &formula, type);
+        int res = is_solution_unique(&formula, 1, &solution_count);
+        free_formula(&formula);
+        if (res == RES_TIME_OUT || (double)(clock() - start_time) > TIME_LIMIT * CLOCKS_PER_SEC)
+        {
+            return RES_TIME_OUT;
+        }
+    } while (solution_count == 1 && ++i < 81);
+    if (solution_count > 1)
+    {
+        board[dig_sequence[i - 1] / 9][dig_sequence[i - 1] % 9] = record_last;
+    }
+    else if (solution_count == 0)
+    {
+        return -1;
+    }
+    return 1;
+}
 
 static int shuffle_array(int *arr, int n)
 {
@@ -113,9 +258,8 @@ static int check_sudoku(int sudoku[9][9], int type, int x, int y)
     }
     return 1;
 }
-static int fill_sudoku(int sudoku[9][9], int type, int x, int y)
+static int fill_sudoku(int sudoku[9][9], int type, int x, int y, int *arr)
 {
-    int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
     shuffle_array(arr, 9);
     for (int i = 0; i < 9; i++)
     {
@@ -128,13 +272,13 @@ static int fill_sudoku(int sudoku[9][9], int type, int x, int y)
                     return 1;
                 else
                 {
-                    if (fill_sudoku(sudoku, type, x + 1, 0) == 1)
+                    if (fill_sudoku(sudoku, type, x + 1, 0, arr) == 1)
                         return 1;
                 }
             }
             else
             {
-                if (fill_sudoku(sudoku, type, x, y + 1) == 1)
+                if (fill_sudoku(sudoku, type, x, y + 1, arr) == 1)
                     return 1;
             }
         }
@@ -433,6 +577,7 @@ int convert_solution_to_sudoku(int *solution, int sudoku[9][9])
 }
 int read_sudoku_from_file(char *filename, int sudoku[9][9])
 {
+
     static char current_filename[100] = "";
     static FILE *fp = NULL;
     if (strcmp(filename, current_filename) != 0)
@@ -442,7 +587,7 @@ int read_sudoku_from_file(char *filename, int sudoku[9][9])
         fp = fopen(filename, "r");
         if (!fp)
         {
-            filename[0] = '\0';
+            current_filename[0] = '\0';
             return -1;
         }
         strcpy(current_filename, filename);
