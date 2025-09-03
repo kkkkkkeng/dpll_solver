@@ -39,7 +39,19 @@ static int dpll_recursive(Formula *formula, int *literal_status, int branch_sele
 static int is_solution_unique_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map, clock_t start_time, int *solution_count);
 static vector *create_variable_map(Formula *formula);
 static int literal_to_index(Formula *formula, int literal);
+static int index_to_literal(Formula *formula, int index);
 
+static int index_to_literal(Formula *formula, int index)
+{
+    if (index > formula->variable_num)
+    {
+        return index - formula->variable_num;
+    }
+    else
+    {
+        return -index;
+    }
+}
 static int literal_to_index(Formula *formula, int literal)
 {
     if (literal > 0)
@@ -70,7 +82,7 @@ static vector *create_variable_map(Formula *formula)
 }
 static int free_variable_map(Formula *formula, vector *variable_map)
 {
-    for (int i = 0; i <  formula->variable_num + 1; i++)
+    for (int i = 0; i < formula->variable_num + 1; i++)
     {
         free_vector(&variable_map[i]);
     }
@@ -184,7 +196,7 @@ static int findUnitLiteral(Clause *clause, int *literal_status)
             literal_count++;
             unit_literal = clause->literal_array[i];
         }
-        else if (literal_status[variable] * clause->literal_array[i] > 0)
+        else if (literal_status[variable] *clause->literal_array[i] > 0 )
         {
             return 0;
         }
@@ -192,6 +204,10 @@ static int findUnitLiteral(Clause *clause, int *literal_status)
     if (literal_count == 1)
     {
         return unit_literal;
+    }
+    else if (literal_count == 0)
+    {
+        return -1;
     }
     return 0;
 }
@@ -277,6 +293,10 @@ static int record_UnitClause(Formula *formula, int *literal_status, int *trail, 
         int unit_literal = findUnitLiteral(&(formula->clause_array[i]), literal_status);
         if (unit_literal)
         {
+            if (unit_literal == -1)
+            {
+                continue;
+            }
             int variable = abs(unit_literal);
             if (literal_status[variable])
             {
@@ -309,6 +329,10 @@ static int record_UnitClause(Formula *formula, int *literal_status, int *trail, 
         int unit_literal = findUnitLiteral(&(formula->clause_array[index]), literal_status);
         if (unit_literal)
         {
+            if (unit_literal == -1)
+            {
+                continue;
+            }
             int next_variable = abs(unit_literal);
             if (literal_status[next_variable])
             {
@@ -332,10 +356,10 @@ static int record_UnitClause(Formula *formula, int *literal_status, int *trail, 
                 assign_literal(literal_status, next_variable, unit_literal > 0 ? 1 : -1, trail, trail_pointer);
             }
         }
-        free_queue(&q);
-        free(inqueue_flag);
-        return 1;
     }
+    free_queue(&q);
+    free(inqueue_flag);
+    return 1;
 }
 
 // static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer)
@@ -394,8 +418,8 @@ static int select_branch_variable(Formula *formula, int *literal_status, int bra
     }
     else
     {
-        int count_variable[formula->variable_num + 1];
-        for (int i = 0; i <= formula->variable_num; i++)
+        int count_variable[2 * formula->variable_num + 1];
+        for (int i = 0; i <= 2*formula->variable_num; i++)
         {
             count_variable[i] = 0;
         }
@@ -404,21 +428,22 @@ static int select_branch_variable(Formula *formula, int *literal_status, int bra
             for (int j = 0; j < formula->clause_array[i].literal_num; j++)
             {
                 int var = abs(formula->clause_array[i].literal_array[j]);
+                int index = literal_to_index(formula, formula->clause_array[i].literal_array[j]);
                 if (!literal_status[var])
                 {
-                    count_variable[var]++;
+                    count_variable[index]++;
                 }
             }
         }
         int max_var = 0;
-        for (int i = 1; i <= formula->variable_num; i++)
+        for (int i = 1; i <= 2 * formula->variable_num; i++)
         {
-            if (!literal_status[i] && count_variable[i] > count_variable[max_var])
+            if (!literal_status[i > formula->variable_num ? i - formula->variable_num : i] && count_variable[i] > count_variable[max_var])
             {
                 max_var = i;
             }
         }
-        return max_var;
+        return index_to_literal(formula, max_var);
     }
 }
 static int check_formula(Formula *formula, int *literal_status)
@@ -472,7 +497,7 @@ static int dpll_recursive(Formula *formula, int *literal_status, int branch_sele
             return RES_UNSAT;
         }
         int level = *trail_pointer;
-        assign_literal(literal_status, next_variable, 1, trail, trail_pointer);
+        assign_literal(literal_status, abs(next_variable), next_variable > 0 ? 1 : -1, trail, trail_pointer);
         int res = dpll_recursive(formula, literal_status, branch_select_straregy, trail, trail_pointer, variable_map, start_time, select_time);
         if (res == RES_TIME_OUT)
         {
@@ -483,7 +508,7 @@ static int dpll_recursive(Formula *formula, int *literal_status, int branch_sele
             return RES_SAT;
         }
         backtrack(literal_status, level, trail, trail_pointer);
-        assign_literal(literal_status, next_variable, -1, trail, trail_pointer);
+        assign_literal(literal_status, abs(next_variable), next_variable > 0 ? -1 : 1, trail, trail_pointer);
         res = dpll_recursive(formula, literal_status, branch_select_straregy, trail, trail_pointer, variable_map, start_time, select_time);
         if (res == RES_TIME_OUT)
         {
