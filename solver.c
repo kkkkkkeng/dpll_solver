@@ -18,6 +18,13 @@ typedef struct queue
     int rear;
     int capacity;
 } queue;
+
+typedef struct Frequency
+{
+    int index;
+    int frequency;
+} Frequency;
+
 static void init_vector(vector *v);              // 初始化动态数组
 static void add_to_vector(vector *v, int value); // 向动态数组中添加元素
 static void free_vector(vector *v);              // 释放动态数组
@@ -27,16 +34,16 @@ static int enqueue(queue *q, int value);         // 入队
 static int dequeue(queue *q, int *value);        // 出队
 static void free_queue(queue *q);                // 释放队列
 
-static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer);                                                                                      // 为变元var赋值value,并将赋值信息记录到trail中
-static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer);                                                                                                    // 回溯到level层
-static int findUnitLiteral(Clause *clause, int *literal_status);                                                                                                                          // 查找clause中的单变元
-static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map);                                                                // 将formula中的单变元子句记录到literal_status中; 出现矛盾直接返回-1;
-static int init_status(Formula *formula, int *literal_status);                                                                                                                            // 初始化literal_status数组
-static int check_clause(Clause *clause, int *literal_status);                                                                                                                             // 检查子句是否满足
-static int select_branch_variable(Formula *formula, int *literal_status, int branch_select_straregy);                                                                                     // 选择分支变元
-static int check_formula(Formula *formula, int *literal_status);                                                                                                                          // 检查当前状态下所有子句是否有解
-static int dpll_recursive(Formula *formula, int *literal_status, int branch_select_strategy, int *trail, int *trail_pointer, vector *variable_map, clock_t start_time, int *select_time); // dpll_solve内部调用 递归处理dpll算法
-static int is_solution_unique_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map, clock_t start_time, int *solution_count);
+static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer);                                                                                                            // 为变元var赋值value,并将赋值信息记录到trail中
+static void backtrack(int *literal_status, int level, int *trail, int *trail_pointer);                                                                                                                          // 回溯到level层
+static int findUnitLiteral(Clause *clause, int *literal_status);                                                                                                                                                // 查找clause中的单变元
+static int record_UnitClause(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map);                                                                                      // 将formula中的单变元子句记录到literal_status中; 出现矛盾直接返回-1;
+static int init_status(Formula *formula, int *literal_status);                                                                                                                                                  // 初始化literal_status数组
+static int check_clause(Clause *clause, int *literal_status);                                                                                                                                                   // 检查子句是否满足
+static int select_branch_variable(Formula *formula, int *literal_status, int branch_select_straregy, Frequency *frequency);                                                                                     // 选择分支变元
+static int check_formula(Formula *formula, int *literal_status);                                                                                                                                                // 检查当前状态下所有子句是否有解
+static int dpll_recursive(Formula *formula, int *literal_status, int branch_select_strategy, int *trail, int *trail_pointer, vector *variable_map, Frequency *frequency, clock_t start_time, int *select_time); // dpll_solve内部调用 递归处理dpll算法
+static int is_solution_unique_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map, Frequency *frequency, clock_t start_time, int *solution_count);
 static vector *create_variable_map(Formula *formula);
 static int literal_to_index(Formula *formula, int literal);
 static int index_to_literal(Formula *formula, int index);
@@ -91,6 +98,37 @@ static int free_variable_map(Formula *formula, vector *variable_map)
     return 1;
 }
 
+static Frequency *init_frequency(Formula *formula)
+{
+    Frequency *freq = (Frequency *)malloc(sizeof(Frequency) * (2 * formula->variable_num + 1));
+    for (int i = 0; i <= 2 * formula->variable_num; i++)
+    {
+        freq[i].frequency = 0;
+        freq[i].index = i;
+    }
+    for (int i = 0; i < formula->clause_num; i++)
+    {
+        for (int j = 0; j < formula->clause_array[i].literal_num; j++)
+        {
+            int index = literal_to_index(formula, formula->clause_array[i].literal_array[j]);
+            freq[index].frequency++;
+        }
+    }
+    for (int i = 1; i <= 2 * formula->variable_num; i++)
+    {
+        for (int j = i + 1; j <= 2 * formula->variable_num; j++)
+        {
+            if (freq[i].frequency < freq[j].frequency)
+            {
+                Frequency temp = freq[i];
+                freq[i] = freq[j];
+                freq[j] = temp;
+            }
+        }
+    }
+    return freq;
+}
+
 int is_solution_unique(Formula *formula, int branch_select_strategy, int *solution_count)
 {
     vector *variable_map = create_variable_map(formula);
@@ -100,25 +138,27 @@ int is_solution_unique(Formula *formula, int branch_select_strategy, int *soluti
     int trail_pointer = 0;
     *solution_count = 0;
     init_status(formula, literal_status);
-    int res = is_solution_unique_recursive(formula, literal_status, trail, &trail_pointer, variable_map, start_time, solution_count);
+    Frequency *frequency = init_frequency(formula);
+    int res = is_solution_unique_recursive(formula, literal_status, trail, &trail_pointer, variable_map, frequency, start_time, solution_count);
     free_variable_map(formula, variable_map);
     free(literal_status);
     free(trail);
+    free(frequency);
     if (res == RES_TIME_OUT)
     {
         return RES_TIME_OUT;
     }
     if (*solution_count > 1)
     {
-        return 1;
+        return -1;
     }
     else
     {
-        return -1;
+        return 1;
     }
 }
 
-static int is_solution_unique_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map, clock_t start_time, int *solution_count)
+static int is_solution_unique_recursive(Formula *formula, int *literal_status, int *trail, int *trail_pointer, vector *variable_map, Frequency *frequency, clock_t start_time, int *solution_count)
 {
     if ((double)(clock() - start_time) > TIME_LIMIT * CLOCKS_PER_SEC)
     {
@@ -146,14 +186,14 @@ static int is_solution_unique_recursive(Formula *formula, int *literal_status, i
     }
     else
     {
-        int next_variable = select_branch_variable(formula, literal_status, OPTIMIZED1);
+        int next_variable = select_branch_variable(formula, literal_status, RANDOM, frequency);
         if (next_variable == 0)
         {
             return RES_UNSAT;
         }
         int level = *trail_pointer;
-        assign_literal(literal_status, next_variable, 1, trail, trail_pointer);
-        int res = is_solution_unique_recursive(formula, literal_status, trail, trail_pointer, variable_map, start_time, solution_count);
+        assign_literal(literal_status, abs(next_variable), next_variable > 0 ? 1 : -1, trail, trail_pointer);
+        int res = is_solution_unique_recursive(formula, literal_status, trail, trail_pointer, variable_map, frequency, start_time, solution_count);
         if (res == RES_TIME_OUT)
         {
             return RES_TIME_OUT;
@@ -161,8 +201,8 @@ static int is_solution_unique_recursive(Formula *formula, int *literal_status, i
         else if (res == RES_UNSAT)
         {
             backtrack(literal_status, level, trail, trail_pointer);
-            assign_literal(literal_status, next_variable, -1, trail, trail_pointer);
-            res = is_solution_unique_recursive(formula, literal_status, trail, trail_pointer, variable_map, start_time, solution_count);
+            assign_literal(literal_status, abs(next_variable), next_variable > 0 ? -1 : 1, trail, trail_pointer);
+            res = is_solution_unique_recursive(formula, literal_status, trail, trail_pointer, variable_map, frequency, start_time, solution_count);
             if (res == RES_TIME_OUT)
             {
                 return RES_TIME_OUT;
@@ -194,9 +234,13 @@ static int findUnitLiteral(Clause *clause, int *literal_status)
         if (!literal_status[variable])
         {
             literal_count++;
+            if (literal_count > 2)
+            {
+                return 0;
+            }
             unit_literal = clause->literal_array[i];
         }
-        else if (literal_status[variable] *clause->literal_array[i] > 0 )
+        else if (literal_status[variable] * clause->literal_array[i] > 0)
         {
             return 0;
         }
@@ -353,8 +397,8 @@ static int record_UnitClause(Formula *formula, int *literal_status, int *trail, 
                 }
                 inqueue_flag[next_index] = 1;
                 enqueue(&q, next_index);
-                assign_literal(literal_status, next_variable, unit_literal > 0 ? 1 : -1, trail, trail_pointer);
             }
+            assign_literal(literal_status, next_variable, unit_literal > 0 ? 1 : -1, trail, trail_pointer);
         }
     }
     free_queue(&q);
@@ -404,7 +448,7 @@ static int check_clause(Clause *clause, int *literal_status)
     return 0;
 }
 
-static int select_branch_variable(Formula *formula, int *literal_status, int branch_select_strategy)
+static int select_branch_variable(Formula *formula, int *literal_status, int branch_select_strategy, Frequency *frequency)
 {
     if (branch_select_strategy == RANDOM)
     {
@@ -416,10 +460,21 @@ static int select_branch_variable(Formula *formula, int *literal_status, int bra
             }
         }
     }
+    else if (branch_select_strategy == OPTIMIZED1)
+    {
+        for (int i = 1; i <= 2 * formula->variable_num; i++)
+        {
+            int var = index_to_literal(formula, frequency[i].index);
+            if (!literal_status[abs(var)])
+            {
+                return var;
+            }
+        }
+    }
     else
     {
         int count_variable[2 * formula->variable_num + 1];
-        for (int i = 0; i <= 2*formula->variable_num; i++)
+        for (int i = 0; i <= 2 * formula->variable_num; i++)
         {
             count_variable[i] = 0;
         }
@@ -468,7 +523,7 @@ static int check_formula(Formula *formula, int *literal_status)
     return 0;
 }
 
-static int dpll_recursive(Formula *formula, int *literal_status, int branch_select_straregy, int *trail, int *trail_pointer, vector *variable_map, clock_t start_time, int *select_time)
+static int dpll_recursive(Formula *formula, int *literal_status, int branch_select_straregy, int *trail, int *trail_pointer, vector *variable_map, Frequency *frequency, clock_t start_time, int *select_time)
 {
     if ((double)(clock() - start_time) > TIME_LIMIT * CLOCKS_PER_SEC)
     {
@@ -490,7 +545,7 @@ static int dpll_recursive(Formula *formula, int *literal_status, int branch_sele
     }
     else
     {
-        int next_variable = select_branch_variable(formula, literal_status, branch_select_straregy);
+        int next_variable = select_branch_variable(formula, literal_status, branch_select_straregy, frequency);
         (*select_time)++;
         if (next_variable == 0)
         {
@@ -498,7 +553,7 @@ static int dpll_recursive(Formula *formula, int *literal_status, int branch_sele
         }
         int level = *trail_pointer;
         assign_literal(literal_status, abs(next_variable), next_variable > 0 ? 1 : -1, trail, trail_pointer);
-        int res = dpll_recursive(formula, literal_status, branch_select_straregy, trail, trail_pointer, variable_map, start_time, select_time);
+        int res = dpll_recursive(formula, literal_status, branch_select_straregy, trail, trail_pointer, variable_map, frequency, start_time, select_time);
         if (res == RES_TIME_OUT)
         {
             return RES_TIME_OUT;
@@ -509,7 +564,7 @@ static int dpll_recursive(Formula *formula, int *literal_status, int branch_sele
         }
         backtrack(literal_status, level, trail, trail_pointer);
         assign_literal(literal_status, abs(next_variable), next_variable > 0 ? -1 : 1, trail, trail_pointer);
-        res = dpll_recursive(formula, literal_status, branch_select_straregy, trail, trail_pointer, variable_map, start_time, select_time);
+        res = dpll_recursive(formula, literal_status, branch_select_straregy, trail, trail_pointer, variable_map, frequency, start_time, select_time);
         if (res == RES_TIME_OUT)
         {
             return RES_TIME_OUT;
@@ -532,7 +587,8 @@ int dpll_solve(Formula *formula, int branch_select_strategy, int *solution, doub
     int trail_pointer = 0;
     init_status(formula, literal_status);
     vector *variable_map = create_variable_map(formula);
-    int res = dpll_recursive(formula, literal_status, branch_select_strategy, trail, &trail_pointer, variable_map, start_time, select_time);
+    Frequency *frequency = init_frequency(formula);
+    int res = dpll_recursive(formula, literal_status, branch_select_strategy, trail, &trail_pointer, variable_map, frequency, start_time, select_time);
     clock_t end_time = clock();
     *time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     if (res == RES_SAT)
@@ -545,6 +601,7 @@ int dpll_solve(Formula *formula, int branch_select_strategy, int *solution, doub
     free_variable_map(formula, variable_map);
     free(literal_status);
     free(trail);
+    free(frequency);
     return res;
 }
 static void assign_literal(int *literal_status, int var, int value, int *trail, int *trail_pointer)
