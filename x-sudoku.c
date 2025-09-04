@@ -217,7 +217,7 @@ static int propagate_constraints(int sudoku[9][9], int possibilities[9][9][10], 
         return -1;
     if (propagate_constraints_on_col(sudoku, possibilities, row, col, val) == -1)
         return -1;
-    if (propagate_constraints_on_block(sudoku, possibilities, row, col, val, row / 3 * 3, col % 3 * 3) == -1)
+    if (propagate_constraints_on_block(sudoku, possibilities, row, col, val, row / 3 * 3, col / 3 * 3) == -1)
         return -1;
     if (type == PERCENT_SUDOKU)
     {
@@ -339,8 +339,8 @@ static int fill_sudoku_smart(int sudoku[9][9], int type, int *arr, int possibili
             if (fill_sudoku_smart(sudoku, type, arr, possibilities) == 1)
                 return 1;
             memcpy(possibilities, backup, sizeof(backup));
+            sudoku[x][y] = 0;
         }
-        sudoku[x][y] = 0;
     }
     return -1;
 }
@@ -402,8 +402,8 @@ int generate_sudoku(int board[][9], int type)
     init_possibilities((int (*)[9][10])possibilities);
     memset(board, 0, sizeof(int) * 9 * 9);
     int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-    fill_sudoku(board, type, 0, 0, arr);
-    // fill_sudoku_smart(board, type, arr, (int (*)[9][10])possibilities);
+    // fill_sudoku(board, type, 0, 0, arr);
+    fill_sudoku_smart(board, type, arr, (int (*)[9][10])possibilities);
     // print_sudoku(board);
     int dig_sequence[81];
     for (int i = 0; i < 81; i++)
@@ -422,7 +422,7 @@ int generate_sudoku(int board[][9], int type)
         count_sudoku_solutions(board, type, &solution_count);
         // print_sudoku(board);
         i++;
-    } while ( solution_count==1&&i < 81);
+    } while (solution_count == 1 && i < 81);
     // Formula formula;
     // do
     // {
