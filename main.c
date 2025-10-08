@@ -72,7 +72,7 @@ int main()
                 double time = 0.0;
                 int *solution = (int *)malloc((formula.variable_num + 1) * sizeof(int));
                 printf("Solving...\n");
-                res = dpll_solve(&formula, OPTIMIZED1, solution, &time, &select_time);
+                res = dpll_solve(&formula, RANDOM, solution, &time, &select_time);
                 printf("DPLL Solver finished.\n");
                 if (res == RES_SAT)
                 {
@@ -142,6 +142,59 @@ int main()
                         getchar();
                         if (ch == 'n')
                         {
+                            printf("Please enter your choice(row, col, val) or 'q' to quit:\n");
+                            int row, col, val;
+                            int blank_count = 0;
+                            for (int i = 0; i < 9; i++)
+                                for (int j = 0; j < 9; j++)
+                                    if (sudoku[i][j] == 0)
+                                        blank_count++;
+
+                            int resboard[9][9] = {0};
+                            memcpy(resboard, sudoku, sizeof(sudoku));
+                            int branch_select_stategy = 1;
+                            double time = 0;
+                            int select_time = 0;
+                            int res = solve_sudoku(resboard, branch_select_stategy, category, &time, &select_time);
+
+                            while (1)
+                            {
+                                char input[20];
+                                gets(input);
+                                if (strcmp(input, "q") == 0)
+                                    break;
+                                if (sscanf(input, "%d %d %d", &row, &col, &val) != 3)
+                                {
+                                    printf("Error: Invalid input format. Please enter row, col, val or 'q' to quit:\n");
+                                    continue;
+                                }
+                                if (row < 1 || row > 9 || col < 1 || col > 9 || val < 1 || val > 9)
+                                {
+                                    printf("Error: Row, col, and val must be between 1 and 9. Please re-enter or 'q' to quit:\n");
+                                    continue;
+                                }
+                                if (sudoku[row - 1][col - 1] != 0)
+                                {
+                                    printf("Error: Cell (%d, %d) is already filled. Please re-enter or 'q' to quit:\n", row, col);
+                                    continue;
+                                }
+                                if (resboard[row - 1][col - 1] != val)
+                                {
+                                    printf("Error! Please re-enter or 'q' to quit:\n", val, row, col);
+                                    continue;
+                                }
+                                sudoku[row - 1][col - 1] = val;
+                                blank_count--;
+                                printf("Current Sudoku board:\n");
+                                print_sudoku(sudoku);
+                                printf("You have %d blanks left.Please continue!", blank_count);
+                                if (blank_count == 0)
+                                {
+                                    printf("Congratulations! You have completed the Sudoku puzzle!\n");
+                                    getchar();
+                                    break;
+                                }
+                            }
                             break;
                         }
                         else

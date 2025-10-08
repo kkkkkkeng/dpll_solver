@@ -24,7 +24,7 @@ static int add_number_constraint_to_list(clause_list *list, int sudoku[9][9]);  
 static int to_natural(int row, int col, int val);                                         // 将数独中的位置转换为自然数
 static int to_sudoku(int natural, int *row, int *col, int *val);                          // 将自然数转换为数独中的位置和值
 
-// 打乱数组
+                                                   // 打乱数组
 static int check_col(int sudoku[9][9], int x, int y, int val);                                 // 检查列是否有冲突
 static int check_row(int sudoku[9][9], int x, int y, int val);                                 // 检查行是否有冲突
 static int check_block(int sudoku[9][9], int x, int y, int val, int row_start, int col_start); // 检查块是否有冲突
@@ -398,7 +398,7 @@ int solve_sudoku(int sudoku[9][9], int branch_select_stategy, int type, double *
 
 int generate_sudoku(int board[][9], int type)
 {
-
+    
     int dig_sequence[81];
     for (int i = 0; i < 81; i++)
     {
@@ -406,8 +406,7 @@ int generate_sudoku(int board[][9], int type)
     }
     memset(board, 0, sizeof(int) * 9 * 9);
     int arr[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-    if (type == PERCENT_SUDOKU)
-    {
+    if(type==PERCENT_SUDOKU){
         shuffle_array(arr, 9);
         shuffle_array(dig_sequence, 81);
         for (int i = 0; i < 6; i++)
@@ -418,17 +417,16 @@ int generate_sudoku(int board[][9], int type)
         double time = 0;
         solve_sudoku(board, OPTIMIZED1, type, &time, &select_time);
     }
-    else
-    {
+    else{
         int *possibilities = (int *)malloc(sizeof(int) * 9 * 9 * 10);
         init_possibilities((int (*)[9][10])possibilities);
         fill_sudoku_smart(board, type, arr, (int (*)[9][10])possibilities);
     }
-
-    // fill_sudoku(board, type, 0, 0, arr);
-
+    
+        // fill_sudoku(board, type, 0, 0, arr);
+        
     // print_sudoku(board);
-
+    
     shuffle_array(dig_sequence, 81);
     int i = 0;
     int solution_count = 0;
